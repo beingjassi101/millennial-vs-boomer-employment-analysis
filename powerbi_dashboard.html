@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Millennial vs Baby Boomer Employment | Power BI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap');
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --card: #0f3460;
+    --bb: #3b82f6; --ml: #10b981; --amber: #f59e0b; --red: #ef4444;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #1e3a5f;
+    --pbi-yellow: #F2C811;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Power BI Top Bar */
+  .pbi-bar { background: #252537; height: 44px; display: flex; align-items: center; padding: 0 16px; gap: 12px; border-bottom: 1px solid #333355; }
+  .pbi-logo { background: var(--pbi-yellow); color: #1a1a2e; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 2px; letter-spacing: 0.5px; }
+  .pbi-title { font-size: 13px; color: var(--muted); flex: 1; }
+  .pbi-tabs { display: flex; gap: 2px; }
+  .pbi-tab { padding: 8px 16px; font-size: 12px; cursor: pointer; border: none; background: transparent; color: var(--muted); border-bottom: 3px solid transparent; transition: all .15s; }
+  .pbi-tab.active { color: var(--text); border-bottom-color: var(--pbi-yellow); background: rgba(242,200,17,0.07); }
+  .pbi-tab:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.04); }
+
+  /* Filter bar */
+  .filter-bar { background: var(--panel); padding: 8px 20px; display: flex; gap: 16px; align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  select, .toggle-btn { background: #0f3460; border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 3px; font-size: 12px; cursor: pointer; }
+  .toggle-btn { display: flex; gap: 0; overflow: hidden; border-radius: 3px; }
+  .toggle-btn button { background: #0f3460; border: none; color: var(--muted); padding: 4px 12px; font-size: 12px; cursor: pointer; }
+  .toggle-btn button.active { background: var(--pbi-yellow); color: #1a1a2e; font-weight: 600; }
+
+  /* Page sections */
+  .page { display: none; padding: 16px 20px; }
+  .page.active { display: block; }
+
+  /* Grid layouts */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .main-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .full-row { margin-bottom: 14px; }
+
+  /* Cards */
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px; }
+  .card-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 600; }
+
+  /* KPI cards */
+  .kpi { border-top: 3px solid; }
+  .kpi.bb { border-color: var(--bb); }
+  .kpi.ml { border-color: var(--ml); }
+  .kpi.amber { border-color: var(--amber); }
+  .kpi.red { border-color: var(--red); }
+  .kpi-val { font-size: 28px; font-weight: 700; margin-bottom: 2px; }
+  .kpi-val.bb { color: var(--bb); }
+  .kpi-val.ml { color: var(--ml); }
+  .kpi-val.amber { color: var(--amber); }
+  .kpi-val.red { color: var(--red); }
+  .kpi-lbl { font-size: 12px; color: var(--muted); }
+  .kpi-sub { font-size: 11px; color: #64748b; margin-top: 3px; }
+
+  /* Charts */
+  .chart-wrap { position: relative; }
+  canvas { max-width: 100%; }
+
+  /* Bar list */
+  .bar-list { display: flex; flex-direction: column; gap: 7px; }
+  .bar-item .bar-meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: var(--text); }
+  .bar-item .bar-meta span { color: var(--muted); }
+  .bar-track { height: 7px; background: var(--card); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+
+  /* Table */
+  .data-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .data-table th { text-align: left; padding: 7px 10px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); }
+  .data-table td { padding: 7px 10px; border-bottom: 1px solid rgba(30,58,95,0.5); }
+  .data-table tr:hover td { background: rgba(59,130,246,0.05); }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.pos { background: rgba(16,185,129,0.15); color: #34d399; }
+  .badge.neg { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  /* Divergence table */
+  .div-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .div-row:last-child { border: none; }
+  .div-header { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; }
+  .pill.pos-bb { background: rgba(59,130,246,0.2); color: #93c5fd; }
+  .pill.pos-ml { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+  .pill.neg { background: rgba(239,68,68,0.18); color: #fca5a5; }
+  .pill.gap { background: rgba(245,158,11,0.2); color: #fcd34d; }
+
+  /* Legend */
+  .legend { display: flex; gap: 16px; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* Info bar */
+  .info-banner { background: rgba(242,200,17,0.08); border: 1px solid rgba(242,200,17,0.25); border-radius: 4px; padding: 8px 14px; font-size: 11px; color: #fde68a; margin-bottom: 14px; }
+
+  @media(max-width:768px) { .kpi-row{grid-template-columns:1fr 1fr;} .main-row,.three-col{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<!-- Power BI Top Bar -->
+<div class="pbi-bar">
+  <span class="pbi-logo">Power BI</span>
+  <span class="pbi-title">Millennial vs Baby Boomer Employment Analysis (2007–2013)</span>
+  <div class="pbi-tabs">
+    <button class="pbi-tab active" onclick="showPage('overview',this)">National Overview</button>
+    <button class="pbi-tab" onclick="showPage('sectors',this)">Sector Deep Dive</button>
+    <button class="pbi-tab" onclick="showPage('states',this)">State Analysis</button>
+    <button class="pbi-tab" onclick="showPage('occupations',this)">Occupations</button>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="filter-bar">
+  <span class="filter-label">Filter:</span>
+  <select id="genFilter" onchange="applyFilters()">
+    <option value="both">Both Generations</option>
+    <option value="bb">Baby Boomers Only</option>
+    <option value="ml">Millennials Only</option>
+  </select>
+  <span class="filter-label">Year Range:</span>
+  <span style="font-size:12px;color:var(--text)">2007 – 2013</span>
+  <span class="filter-label">Data Source:</span>
+  <span style="font-size:12px;color:var(--pbi-yellow)">EMSI Employment Dataset</span>
+  <span style="margin-left:auto;font-size:11px;color:var(--muted)">Last refresh: EMSI_MillenialsvsBabyBoomers.xlsx</span>
+</div>
+
+<!-- PAGE 1: NATIONAL OVERVIEW -->
+<div id="page-overview" class="page active">
+  <div class="info-banner">📊 This dashboard replicates a Power BI report. All figures are sourced from EMSI's Millennial vs Baby Boomer employment dataset (2007–2013), covering 51 states, 366 metro areas, and 23 major occupational sectors.</div>
+  <div class="kpi-row">
+    <div class="card kpi bb"><div class="card-title">Baby Boomer Jobs 2007</div><div class="kpi-val bb">21.4M</div><div class="kpi-lbl">Base employment</div></div>
+    <div class="card kpi bb"><div class="card-title">Baby Boomer Jobs 2013</div><div class="kpi-val bb">23.3M</div><div class="kpi-lbl">+1,945,665 net new (+9.7%)</div></div>
+    <div class="card kpi ml"><div class="card-title">Millennial Jobs 2007</div><div class="kpi-val ml">40.8M</div><div class="kpi-lbl">Base employment</div></div>
+    <div class="card kpi ml"><div class="card-title">Millennial Jobs 2013</div><div class="kpi-val ml">40.9M</div><div class="kpi-lbl">+109,919 net new (+0.3%)</div></div>
+  </div>
+  <div class="main-row">
+    <div class="card">
+      <div class="card-title">Total Jobs — 2007 vs 2013 by Generation</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="c-overview-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Net Job Change by Generation</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="c-change-doughnut"></canvas></div>
+    </div>
+  </div>
+  <div class="kpi-row">
+    <div class="card kpi amber"><div class="card-title">States w/ BB Growth</div><div class="kpi-val amber">51/51</div><div class="kpi-lbl">All states grew for Boomers</div></div>
+    <div class="card kpi red"><div class="card-title">States w/ ML Growth</div><div class="kpi-val red">23/51</div><div class="kpi-lbl">28 states declined for Millennials</div></div>
+    <div class="card kpi bb"><div class="card-title">BB MSA Avg Growth</div><div class="kpi-val bb">+8.4%</div><div class="kpi-lbl">Across 366 metro areas</div></div>
+    <div class="card kpi ml"><div class="card-title">ML MSA Avg Growth</div><div class="kpi-val ml">+0.2%</div><div class="kpi-lbl">Across 366 metro areas</div></div>
+  </div>
+</div>
+
+<!-- PAGE 2: SECTOR DEEP DIVE -->
+<div id="page-sectors" class="page">
+  <div class="main-row">
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-title">% Job Change by Sector — Baby Boomers vs Millennials</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--bb)"></div>Baby Boomers</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ml)"></div>Millennials</div>
+      </div>
+      <div class="chart-wrap" style="height:380px"><canvas id="c-sector-compare"></canvas></div>
+    </div>
+  </div>
+  <div class="card full-row">
+    <div class="card-title">Sector Divergence Analysis — Where Generations Diverged Most</div>
+    <div class="div-row div-header"><span>Sector</span><span>BB % Change</span><span>ML % Change</span><span>Gap (pp)</span></div>
+    <div class="div-row"><span>Computer & Math</span><span><div class="pill pos-bb">+19.8%</div></span><span><div class="pill pos-ml">+2.0%</div></span><span><div class="pill gap">17.8 pp</div></span></div>
+    <div class="div-row"><span>Production</span><span><div class="pill pos-bb">+4.8%</div></span><span><div class="pill neg">-12.7%</div></span><span><div class="pill gap">17.5 pp</div></span></div>
+    <div class="div-row"><span>Construction</span><span><div class="pill neg">-3.0%</div></span><span><div class="pill neg">-19.2%</div></span><span><div class="pill gap">16.2 pp</div></span></div>
+    <div class="div-row"><span>Transportation</span><span><div class="pill pos-bb">+9.6%</div></span><span><div class="pill neg">-5.7%</div></span><span><div class="pill gap">15.3 pp</div></span></div>
+    <div class="div-row"><span>Office & Admin Support</span><span><div class="pill pos-bb">+9.7%</div></span><span><div class="pill neg">-3.6%</div></span><span><div class="pill gap">13.3 pp</div></span></div>
+    <div class="div-row"><span>Management</span><span><div class="pill pos-bb">+2.8%</div></span><span><div class="pill neg">-6.1%</div></span><span><div class="pill gap">8.9 pp</div></span></div>
+    <div class="div-row"><span>Healthcare Support</span><span><div class="pill pos-bb">+26.5%</div></span><span><div class="pill pos-ml">+15.6%</div></span><span><div class="pill gap">10.9 pp</div></span></div>
+    <div class="div-row"><span>Food Prep & Serving</span><span><div class="pill pos-bb">+20.0%</div></span><span><div class="pill pos-ml">+17.7%</div></span><span><div class="pill gap">2.3 pp</div></span></div>
+  </div>
+</div>
+
+<!-- PAGE 3: STATE ANALYSIS -->
+<div id="page-states" class="page">
+  <div class="kpi-row">
+    <div class="card kpi bb"><div class="card-title">Best BB State</div><div class="kpi-val bb">+27.9%</div><div class="kpi-lbl">North Dakota</div></div>
+    <div class="card kpi red"><div class="card-title">Worst BB State</div><div class="kpi-val red">-2.4%</div><div class="kpi-lbl">Nevada</div></div>
+    <div class="card kpi ml"><div class="card-title">Best ML State</div><div class="kpi-val ml">+33.5%</div><div class="kpi-lbl">North Dakota</div></div>
+    <div class="card kpi red"><div class="card-title">Worst ML State</div><div class="kpi-val red">-8.8%</div><div class="kpi-lbl">Nevada</div></div>
+  </div>
+  <div class="main-row">
+    <div class="card">
+      <div class="card-title">Top 10 States — Baby Boomer % Job Growth</div>
+      <div class="bar-list" id="bb-state-bars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top 10 States — Millennial % Job Growth</div>
+      <div class="bar-list" id="ml-state-bars"></div>
+    </div>
+  </div>
+  <div class="card full-row">
+    <div class="card-title">All States — Ranked by % Change (Baby Boomers)</div>
+    <div style="overflow-x:auto;max-height:280px;overflow-y:auto">
+      <table class="data-table" id="state-table"></table>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 4: OCCUPATIONS -->
+<div id="page-occupations" class="page">
+  <div class="main-row">
+    <div class="card">
+      <div class="card-title">Baby Boomers — Top 10 Occupation Gains (Absolute Jobs)</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="c-bb-occ"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Millennials — Top 10 Occupation Gains (Absolute Jobs)</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="c-ml-occ"></canvas></div>
+    </div>
+  </div>
+  <div class="main-row">
+    <div class="card">
+      <div class="card-title">Baby Boomers — Biggest Job Losses</div>
+      <table class="data-table">
+        <tr><th>Occupation</th><th>Job Change</th><th>% Change</th></tr>
+        <tr><td>Farmers & Ranchers</td><td><span class="badge neg">-23,652</span></td><td style="color:#f87171">-17.8%</td></tr>
+        <tr><td>Construction Managers</td><td><span class="badge neg">-19,203</span></td><td style="color:#f87171">-21.9%</td></tr>
+        <tr><td>Carpenters</td><td><span class="badge neg">-14,994</span></td><td style="color:#f87171">-10.5%</td></tr>
+        <tr><td>Real Estate Agents</td><td><span class="badge neg">-14,968</span></td><td style="color:#f87171">-11.7%</td></tr>
+        <tr><td>Postal Mail Carriers</td><td><span class="badge neg">-13,858</span></td><td style="color:#f87171">-16.8%</td></tr>
+        <tr><td>Postal Mail Sorters</td><td><span class="badge neg">-12,019</span></td><td style="color:#f87171">-29.2%</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Millennials — Biggest Job Losses</div>
+      <table class="data-table">
+        <tr><th>Occupation</th><th>Job Change</th><th>% Change</th></tr>
+        <tr><td>Carpenters</td><td><span class="badge neg">-112,211</span></td><td style="color:#f87171">-28.0%</td></tr>
+        <tr><td>Construction Laborers</td><td><span class="badge neg">-73,274</span></td><td style="color:#f87171">-15.7%</td></tr>
+        <tr><td>Team Assemblers</td><td><span class="badge neg">-54,240</span></td><td style="color:#f87171">-16.1%</td></tr>
+        <tr><td>Secretaries & Admin Asst.</td><td><span class="badge neg">-53,846</span></td><td style="color:#f87171">-8.6%</td></tr>
+        <tr><td>Heavy Truck Drivers</td><td><span class="badge neg">-45,785</span></td><td style="color:#f87171">-12.4%</td></tr>
+        <tr><td>Electricians</td><td><span class="badge neg">-42,044</span></td><td style="color:#f87171">-17.8%</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const BB='#3b82f6', ML='#10b981', AMBER='#f59e0b', RED='#ef4444';
+const GRID = 'rgba(30,58,95,0.5)', TICK = '#64748b';
+
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
+Chart.defaults.font.size = 11;
+
+function showPage(id, tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.pbi-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  tab.classList.add('active');
+  setTimeout(initPageCharts, 50);
+}
+
+let chartsInit = {};
+
+function initPageCharts() {
+  // Overview
+  if (!chartsInit.overview && document.getElementById('c-overview-bar')) {
+    chartsInit.overview = true;
+    new Chart(document.getElementById('c-overview-bar'), {
+      type: 'bar',
+      data: { labels: ['Baby Boomers', 'Millennials'],
+        datasets: [
+          { label: '2007 Jobs', data: [21357823, 40797493], backgroundColor: 'rgba(59,130,246,0.7)', borderColor: BB, borderWidth: 1 },
+          { label: '2013 Jobs', data: [23303488, 40907412], backgroundColor: 'rgba(16,185,129,0.7)', borderColor: ML, borderWidth: 1 }
+        ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
+        scales: { y: { grid: { color: GRID }, ticks: { color: TICK, callback: v => (v/1e6).toFixed(0)+'M' } }, x: { grid: { display: false } } } }
+    });
+    new Chart(document.getElementById('c-change-doughnut'), {
+      type: 'doughnut',
+      data: { labels: ['BB Net Job Growth', 'ML Net Job Growth'],
+        datasets: [{ data: [1945665, 109919], backgroundColor: [BB, ML], borderColor: '#16213e', borderWidth: 3 }]},
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.label + ': +' + c.raw.toLocaleString() } } } }
+    });
+  }
+
+  // Sectors
+  if (!chartsInit.sectors && document.getElementById('c-sector-compare')) {
+    chartsInit.sectors = true;
+    const sectors = ['Healthcare Support','Food Prep','Computer & Math','Personal Care','Life Science','Business & Finance','Building & Grounds','Healthcare Practitioners','Sales','Office & Admin','Transportation','Production','Architecture','Management','Construction'];
+    const bbVals =  [26.5, 20.0, 19.8, 17.5, 13.7, 11.5, 10.3, 21.8, 8.7, 9.7, 9.6, 4.8, 9.4, 2.8, -3.0];
+    const mlVals =  [15.6, 17.7, 2.0, 14.0, 5.2, -0.6, 4.0, 11.0, 1.7, -3.6, -5.7, -12.7, -10.5, -6.1, -19.2];
+    new Chart(document.getElementById('c-sector-compare'), {
+      type: 'bar',
+      data: { labels: sectors,
+        datasets: [
+          { label: 'Baby Boomers %', data: bbVals, backgroundColor: 'rgba(59,130,246,0.75)', borderColor: BB, borderWidth: 1 },
+          { label: 'Millennials %', data: mlVals, backgroundColor: 'rgba(16,185,129,0.75)', borderColor: ML, borderWidth: 1 }
+        ]},
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: GRID }, ticks: { color: TICK, callback: v => v+'%' } },
+          y: { grid: { display: false }, ticks: { color: '#e2e8f0', font: { size: 10 } } }
+        } }
+    });
+  }
+
+  // Occupations
+  if (!chartsInit.occ && document.getElementById('c-bb-occ')) {
+    chartsInit.occ = true;
+    const bbOccs = ['Registered Nurses','Personal Care Aides','Retail Salespersons','Office Clerks','Cashiers','Customer Svc Reps','Janitors','Home Health Aides','Food Prep Workers','Bookkeeping Clerks'];
+    const bbVals = [111017,78831,62691,59747,57791,45678,43731,48877,38359,33198];
+    new Chart(document.getElementById('c-bb-occ'), {
+      type: 'bar', data: { labels: bbOccs, datasets: [{ label: 'Job Change', data: bbVals, backgroundColor: 'rgba(59,130,246,0.75)', borderColor: BB, borderWidth: 1 }]},
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { grid: { color: GRID }, ticks: { color: TICK, callback: v => '+' + (v/1000).toFixed(0)+'K' } }, y: { grid: { display: false }, ticks: { color: '#e2e8f0', font: { size: 9 } } } } }
+    });
+    const mlOccs = ['Fast Food / Food Prep','Waiters & Waitresses','Cashiers','Personal Care Aides','Home Health Aides','Registered Nurses','Retail Salespersons','Restaurant Cooks','Nursing Assistants','Food Prep Workers'];
+    const mlVals = [204545,149992,127939,98461,77619,61405,60186,57909,45076,41075];
+    new Chart(document.getElementById('c-ml-occ'), {
+      type: 'bar', data: { labels: mlOccs, datasets: [{ label: 'Job Change', data: mlVals, backgroundColor: 'rgba(16,185,129,0.75)', borderColor: ML, borderWidth: 1 }]},
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { grid: { color: GRID }, ticks: { color: TICK, callback: v => '+' + (v/1000).toFixed(0)+'K' } }, y: { grid: { display: false }, ticks: { color: '#e2e8f0', font: { size: 9 } } } } }
+    });
+  }
+}
+
+// ── STATE BARS ────────────────────────────────────────────────────────────────
+const bbStates = [{s:'North Dakota',p:27.95},{s:'Texas',p:17.76},{s:'South Dakota',p:15.62},{s:'Utah',p:15.54},{s:'Wyoming',p:14.38},{s:'Colorado',p:13.58},{s:'Alaska',p:13.37},{s:'Nebraska',p:13.05},{s:'Minnesota',p:12.78},{s:'Massachusetts',p:12.25}];
+const mlStates = [{s:'North Dakota',p:33.54},{s:'Texas',p:8.21},{s:'Alaska',p:7.91},{s:'D.C.',p:6.56},{s:'South Dakota',p:5.73},{s:'Louisiana',p:4.61},{s:'New York',p:3.96},{s:'Wyoming',p:3.83},{s:'Massachusetts',p:3.78},{s:'Minnesota',p:3.44}];
+
+function renderBars(id, items, color) {
+  const maxP = Math.max(...items.map(d=>d.p));
+  document.getElementById(id).innerHTML = items.map(d=>`
+    <div class="bar-item">
+      <div class="bar-meta"><span>${d.s}</span><span style="color:${color};font-weight:600">+${d.p.toFixed(1)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${d.p/maxP*100}%;background:${color}"></div></div>
+    </div>`).join('');
+}
+renderBars('bb-state-bars', bbStates, BB);
+renderBars('ml-state-bars', mlStates, ML);
+
+// ── STATE TABLE ───────────────────────────────────────────────────────────────
+const allBBStates = [{s:'North Dakota',bb:27.95,ml:33.54},{s:'Texas',bb:17.76,ml:8.21},{s:'South Dakota',bb:15.62,ml:5.73},{s:'Utah',bb:15.54,ml:1.75},{s:'Wyoming',bb:14.38,ml:3.83},{s:'Colorado',bb:13.58,ml:3.11},{s:'Alaska',bb:13.37,ml:7.91},{s:'Nebraska',bb:13.05,ml:1.68},{s:'Minnesota',bb:12.78,ml:3.44},{s:'Massachusetts',bb:12.25,ml:3.78},{s:'Louisiana',bb:12.15,ml:4.61},{s:'Wisconsin',bb:11.37,ml:0.61},{s:'W. Virginia',bb:11.27,ml:-0.02},{s:'Iowa',bb:11.24,ml:3.05},{s:'Montana',bb:10.96,ml:2.35},{s:'Pennsylvania',bb:10.83,ml:2.76},{s:'Vermont',bb:10.81,ml:2.49},{s:'Maryland',bb:10.48,ml:2.45},{s:'Kentucky',bb:10.11,ml:-2.37},{s:'Washington',bb:10.06,ml:1.31},{s:'Indiana',bb:9.92,ml:-0.58},{s:'Kansas',bb:9.85,ml:0.91},{s:'New York',bb:9.61,ml:3.96},{s:'New Hampshire',bb:9.55,ml:-1.13},{s:'Virginia',bb:9.48,ml:0.01},{s:'D.C.',bb:9.37,ml:6.56},{s:'Oklahoma',bb:8.79,ml:2.30},{s:'Illinois',bb:8.49,ml:-2.13},{s:'Delaware',bb:7.97,ml:-2.63},{s:'New Jersey',bb:7.92,ml:-2.50},{s:'Tennessee',bb:7.88,ml:-2.12},{s:'Missouri',bb:7.80,ml:-0.57},{s:'Maine',bb:7.66,ml:-0.92},{s:'Hawaii',bb:7.66,ml:-1.88},{s:'Ohio',bb:7.63,ml:-2.55},{s:'Connecticut',bb:7.55,ml:0.95},{s:'Michigan',bb:7.40,ml:-2.95},{s:'N. Carolina',bb:7.36,ml:-2.37},{s:'Georgia',bb:7.35,ml:-3.88},{s:'California',bb:7.31,ml:-0.89},{s:'New Mexico',bb:7.19,ml:-0.94},{s:'Arizona',bb:6.80,ml:-4.51},{s:'Idaho',bb:6.50,ml:-4.16},{s:'Rhode Island',bb:6.49,ml:-3.60},{s:'Arkansas',bb:6.47,ml:-1.78},{s:'Oregon',bb:5.86,ml:-1.74},{s:'Mississippi',bb:5.82,ml:-2.26},{s:'S. Carolina',bb:5.12,ml:-0.87},{s:'Alabama',bb:3.40,ml:-5.75},{s:'Florida',bb:3.34,ml:-4.89},{s:'Nevada',bb:-2.35,ml:-8.79}];
+
+document.getElementById('state-table').innerHTML = `<tr><th>Rank</th><th>State</th><th>BB % Change</th><th>ML % Change</th></tr>` +
+  allBBStates.map((d,i) => `<tr><td style="color:var(--muted)">${i+1}</td><td>${d.s}</td>
+    <td><span class="badge ${d.bb>=0?'pos':'neg'}">${d.bb>=0?'+':''}${d.bb.toFixed(1)}%</span></td>
+    <td><span class="badge ${d.ml>=0?'pos':'neg'}">${d.ml>=0?'+':''}${d.ml.toFixed(1)}%</span></td></tr>`).join('');
+
+function applyFilters() { /* slicer placeholder */ }
+
+// init first page
+initPageCharts();
+</script>
+</body>
+</html>
